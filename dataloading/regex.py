@@ -279,7 +279,7 @@ class ImageFolder(WrapableDataset):
         if type(self._mean) == str:
             self._mean = np.load(os.path.join(self.root, self._mean))
         elif self._mean is None:
-            cur_data = DataLoader(self, batch_size=min(1000, len(self)), shuffle=False, num_workers=8)
+            cur_data = DataLoader(self, batch_size=min(96, len(self)), shuffle=False, num_workers=4)
 
             mean = None
             logging.info('Calculating mean image for "{}"'.format(self.root))

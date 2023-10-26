@@ -124,8 +124,7 @@ class AbstractLogger(object):
         log_path = log_path + '-%d-%02d-%02d-%02d-%02d' % (now.year, now.month, now.day, now.hour, now.minute)
         if os.path.isdir(log_path):
             log_path += '-%02d' % now.second
-
-        os.mkdir(os.path.expanduser(log_path))
+        os.makedirs(log_path, exist_ok=True)
 
         file_handler = logging.FileHandler(os.path.join(log_path, 'log.txt'), mode='w')
         file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s '))

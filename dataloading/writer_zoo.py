@@ -1,7 +1,7 @@
 import os.path
 
 from .regex import ImageFolder
-from .feature_dataset import FeatureDataset
+
 
 class WriterZoo:
 
@@ -10,12 +10,12 @@ class WriterZoo:
         return ImageFolder(desc['path'], regex=desc['regex'], **kwargs)
 
     @staticmethod
-    def get(dataset, set, **kwargs):
+    def get(dataset, set, base_dir, **kwargs):
         _all = WriterZoo.datasets
         d = _all[dataset]
         s = d['set'][set]
 
-        s['path'] = os.path.join(d['basepath'], s['path'])
+        s['path'] = os.path.join(base_dir, s['path'])
         return WriterZoo.new(s, **kwargs)
 
     datasets = {
@@ -23,10 +23,10 @@ class WriterZoo:
         'hisfrag20': {
             'basepath': '/data/mpeer',
             'set': {
-                'test' :  {'path': '/data/mpeer/hisfrag20_test',
+                'test' :  {'path': 'test',
                                   'regex' : {'writer': '(\d+)', 'page': '\d+_(\d+)', 'fragment' : '\d+_\d+_(\d+)'}},
 
-                'train' :  {'path': '/data/mpeer/hisfrag20',
+                'train' :  {'path': 'train',
                                   'regex' : {'writer': '(\d+)', 'page': '\d+_(\d+)', 'fragment' : '\d+_\d+_(\d+)'}},
             }
         },

@@ -133,7 +133,7 @@ def train_one_epoch(model, train_ds, triplet_loss, optimizer, scheduler, epoch, 
 
     # set up the triplet stuff
     sampler = samplers.MPerClassSampler(np.array(train_ds.dataset.labels[args['train_label']])[train_ds.indices], args['train_options']['sampler_m'], length_before_new_iter=args['train_options']['length_before_new_iter']) #len(ds))
-    train_triplet_loader = torch.utils.data.DataLoader(train_ds, sampler=sampler, pin_memory=True, batch_size=args['train_options']['batch_size'], drop_last=True, num_workers=16)
+    train_triplet_loader = torch.utils.data.DataLoader(train_ds, sampler=sampler, pin_memory=True, batch_size=args['train_options']['batch_size'], drop_last=True, num_workers=6)
     # miner = miners.MultiSimilarityMiner(epsilon=0.1) if args['train_options']['loss'] == 'msloss' else None
     # miner = miners.TripletMarginMiner(margin=args['train_options']['margin'], type_of_triplets=args['train_options']['type_of_triplets'])
     # miner = miners.BatchEasyHardMiner()
@@ -322,13 +322,13 @@ def main(args):
     if not args['only_test']:
         train_dataset = None
         if args['trainset']:
-            train_dataset = WriterZoo.get(**args['trainset'])
+            train_dataset = WriterZoo.get(**args['trainset'], base_dir=args['dataset_dir'])
         
         train_ds, val_ds = train_val_split(train_dataset, args)
         model, optimizer = train(model, train_ds, val_ds, args, logger, optimizer)
 
     # testing
-    test_ds = WriterZoo.get(**args['testset']).TransformImages(transform=get_test_tf(args))
+    test_ds = WriterZoo.get(**args['testset'], base_dir=args['dataset_dir']).TransformImages(transform=get_test_tf(args))
 
     test_map , test_top1 = validate(model, test_ds, args, eval_label=args.get('eval_label', 'writer'))
 
@@ -340,77 +340,19 @@ def main(args):
     logger.finish()
 
 
-def main_cross_validate(args):
-    logger = prepare_logging(args)
-    logger.update_config(args)
-
-    dataset = WriterZoo.get(**args['dataset'])
-    cross_val = load_yaml(args['kfold_config'])[args['kfold']]
-    splits = cross_validation_splits(dataset, list(cross_val.values()))
-
-    def flatten(l):
-        return [item for sublist in l for item in sublist]
-
-    maps, top1 = [], []
-    for idx in range(len(splits)):
-        train_indices = splits[idx]
-        val_indices = train_indices[0::int(1/args['val_percentage'])]
-        train_indices = [t_idx for t_idx in train_indices if t_idx not in val_indices]
-        test_indices = flatten(splits[:idx] + splits[idx+1:])
-        
-
-        train_ds = Subset(dataset, train_indices, get_train_tf(args))
-        val_ds = Subset(dataset, val_indices, get_test_tf(args))
-        test_ds = Subset(dataset, test_indices, get_test_tf(args))
-
-        print_info(train_ds, val_ds, test_ds, idx+1, len(splits))
-        
-        model = model_zoo(args)
-        if torch.__version__ == '2.0.0' and args['compile_model']:
-            logging.info("Pytorch 2.0 detected -> compiling model")
-            model = torch.compile(model)
-        model.train()
-        model = model.cuda()
-
-        optimizer = get_optimizer(args, model)
-
-        if args['checkpoint']:
-            print(f'''Loading model from {args['checkpoint']}''')
-            checkpoint = torch.load(args['checkpoint'])
-            model.load_state_dict(checkpoint['model_state_dict'])    
-            model.eval() 
-
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])    
-
-        model, optimizer = train(model, train_ds, val_ds, args, logger, optimizer)
-
-        # testing
-        test_map , test_top1 = validate(model, test_ds, args, eval_label=args.get('eval_label', 'writer'))
-        maps.append(test_map)
-        top1.append(test_top1)
-
-        print(f'Test-mAP k={idx}: {test_map}')
-        print(f'Test-Top1 k={idx}: {test_top1}')
-
-        logger.log_value(f"Test-MAP-{idx}", test_map)
-        logger.log_value(f"Test-Top1-{idx}", test_top1)
-
-    logger.log_value(f"Test-MAP", np.mean(maps))
-    logger.log_value(f"Test-Top1", np.mean(top1))
-    logger.finish()
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s ')
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--config', type=str, default='config/config.yml')
+    parser.add_argument('--dataset_dir', type=str, required=True)
     parser.add_argument('--only_test', default=False, action='store_true',
                         help='only test')
     parser.add_argument('--checkpoint', default=None, type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='enables CUDA training')
-    parser.add_argument('--gpuid', default='1', type=str,
+    parser.add_argument('--gpuid', default='0', type=str,
                         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument('--seed', default=2174, type=int,
                         help='seed')
@@ -426,8 +368,4 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     
     seed_everything(args.seed)
-    if config.get('kfold', None):
-        logging.info('Running kfold cross validation')
-        main_cross_validate(config)
-    else:
-        main(config)
+    main(config)
