@@ -92,16 +92,12 @@ class WrapableDataset(data.Dataset):
 
     @staticmethod
     def supported_classes():
-        import dataloading.create_triplets
-        import dataloading.create_pairs
 
         return {'CombineLabels': 'CombineLabels',
                 'SelectLabels': 'SelectLabels',
                 'TransformImages': 'TransformImages',
                 'Sample': 'Sample',
-                'ClassSampler' : 'ClassSampler',
-                'CreateTriplets': dataloading.create_triplets.CreateTriplets,
-                'CreatePairs': dataloading.create_pairs.CreatePairs}
+                'ClassSampler' : 'ClassSampler'}
 
     def _get_wrapper_class_constructor(self, name):
         def wrapper(*args, **kw):
